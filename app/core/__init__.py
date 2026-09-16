@@ -1,0 +1,1 @@
+"""Cross-cutting core utilities (exceptions, shared types)."""
