@@ -30,7 +30,22 @@ def db_session():
 
 @pytest.fixture()
 def app_client(db_session, monkeypatch):
-    """FastAPI TestClient wired to the isolated in-memory session via dependency override."""
+    """FastAPI TestClient wired to the isolated in-memory session.
+
+    Two things need to point at the test database, not just one:
+    1. The `get_db` dependency (used by the instances/usage/forecast routes).
+    2. `app.db.base.SessionLocal`, `app.agent.tools.SessionLocal` and
+       `app.agent.graph.SessionLocal` (used internally by the agent route,
+       which opens its own sessions outside the FastAPI dependency chain so
+       LangChain tool calls can run independently of the request lifecycle).
+       Each of these modules does `from app.db.base import SessionLocal` at
+       import time, which binds its own private name to the *original*
+       factory object — patching app.db.base.SessionLocal alone does not
+       change those already-bound references, so every module that
+       independently opens sessions must be patched directly. Without this,
+       the agent endpoint reads from the real on-disk DB instead of the
+       isolated in-memory one, and silently "sees" zero instances.
+    """
     from app.api.deps import get_db
     from app.main import app
 
@@ -41,6 +56,13 @@ def app_client(db_session, monkeypatch):
             pass
 
     app.dependency_overrides[get_db] = _override_get_db
+
+    bind = db_session.get_bind()
+    test_session_factory = sessionmaker(bind=bind, autoflush=False, autocommit=False)
+    monkeypatch.setattr("app.db.base.SessionLocal", test_session_factory)
+    monkeypatch.setattr("app.agent.tools.SessionLocal", test_session_factory)
+    monkeypatch.setattr("app.agent.graph.SessionLocal", test_session_factory)
+
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
@@ -74,3 +96,4 @@ def idle_nonprod_instance(db_session):
     db_session.refresh(instance)
     generate_synthetic_history(db_session, instance, days=14, profile="idle", seed=43)
     return instance
+
