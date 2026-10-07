@@ -40,13 +40,23 @@ def _build_eval_db():
 def run_evaluation() -> dict:
     SessionLocal = _build_eval_db()
 
-    # Monkeypatch the app-wide session factory so agent tools/rule-engine use this isolated DB.
+    # Monkeypatch every module-level session factory so the agent uses this
+    # isolated DB. app.db.base.SessionLocal alone is not enough: app.agent.tools
+    # and app.agent.graph each do `from app.db.base import SessionLocal` at
+    # import time, which binds their own private reference to the *original*
+    # factory object. Patching app.db.base.SessionLocal afterward does not
+    # change those already-bound names, so each module must be patched directly.
     import app.db.base as db_base
     import app.agent.tools as tools_module
+    import app.agent.graph as graph_module
 
-    original_session_local = db_base.SessionLocal
+    original_db_base_session_local = db_base.SessionLocal
+    original_tools_session_local = tools_module.SessionLocal
+    original_graph_session_local = graph_module.SessionLocal
+
     db_base.SessionLocal = SessionLocal
     tools_module.SessionLocal = SessionLocal
+    graph_module.SessionLocal = SessionLocal
 
     results = []
     try:
@@ -80,8 +90,9 @@ def run_evaluation() -> dict:
                 }
             )
     finally:
-        db_base.SessionLocal = original_session_local
-        tools_module.SessionLocal = original_session_local
+        db_base.SessionLocal = original_db_base_session_local
+        tools_module.SessionLocal = original_tools_session_local
+        graph_module.SessionLocal = original_graph_session_local
 
     accuracy = round(correct / len(GOLDEN_DATASET), 4)
     report = {"accuracy": accuracy, "total_cases": len(GOLDEN_DATASET), "correct": correct, "cases": results}
@@ -95,4 +106,3 @@ def run_evaluation() -> dict:
 
 if __name__ == "__main__":
     run_evaluation()
-
