@@ -1,4 +1,3 @@
-
 """
 LangGraph ReAct agent orchestration.
 
@@ -20,6 +19,22 @@ from app.db.models import AgentAction, CloudInstance
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _detach_with_instance_loaded(db, actions: list[AgentAction]) -> list[AgentAction]:
+    """Force-load each action's `instance` relationship before expunging.
+
+    AgentAction.instance is lazy-loaded by default. The API layer reads
+    `action.instance.instance_id` after this function returns, by which point
+    the session is closed — accessing a lazy relationship on a detached
+    object raises sqlalchemy.orm.exc.DetachedInstanceError. Touching the
+    attribute here, while the session is still open, caches it on the
+    instance so it is safe to read after detaching.
+    """
+    for action in actions:
+        _ = action.instance.instance_id
+    db.expunge_all()
+    return actions
 
 
 def _build_chat_model():
@@ -73,7 +88,8 @@ def _run_llm_agent(instance_id: str | None, dry_run: bool) -> list[AgentAction]:
                 if instance:
                     from app.agent.rule_based import evaluate_instance
 
-                    actions.append(evaluate_instance(db, instance, dry_run))
+                    action = evaluate_instance(db, instance, dry_run)
+                    actions.extend(_detach_with_instance_loaded(db, [action]))
             continue
 
     # The tools persist AgentAction rows directly; read back the ones created for this run.
@@ -86,7 +102,7 @@ def _run_llm_agent(instance_id: str | None, dry_run: bool) -> list[AgentAction]:
             .limit(len(target_ids) * 3)
             .all()
         )
-        db.expunge_all()
+        rows = _detach_with_instance_loaded(db, rows)
     return actions + rows[: len(target_ids)]
 
 
@@ -103,7 +119,7 @@ def run_agent_optimization(instance_id: str | None, dry_run: bool) -> tuple[list
         logger.info("LLM not configured (LLM_PROVIDER=%s); using rule-based policy", settings.LLM_PROVIDER)
         with SessionLocal() as db:
             actions = run_rule_based_policy(db, instance_id, dry_run)
-            db.expunge_all()
+            actions = _detach_with_instance_loaded(db, actions)
         return actions, "rule_based"
 
     try:
@@ -113,5 +129,5 @@ def run_agent_optimization(instance_id: str | None, dry_run: bool) -> tuple[list
         logger.error("LLM agent unavailable, falling back to rule-based policy: %s", exc)
         with SessionLocal() as db:
             actions = run_rule_based_policy(db, instance_id, dry_run)
-            db.expunge_all()
+            actions = _detach_with_instance_loaded(db, actions)
         return actions, "rule_based_fallback"
