@@ -71,3 +71,36 @@ flowchart LR
     C --> D["Resize / Shutdown<br/>proposal or action"]
     D --> E[("Audit trail")]
 ```
+
+## Problem Statement
+
+Engineering teams routinely over-provision cloud compute and forget to scale
+it back down. Enterprises lose meaningful budget every month to idle or
+oversized EC2-style instances because right-sizing requires someone to
+continuously correlate utilization history, forecast near-term demand, and
+weigh that against the blast radius of touching a production system — work
+that rarely happens manually at scale.
+
+```mermaid
+flowchart LR
+    P1["Teams provision<br/>servers manually"] --> P2["No operational<br/>budget tracking"]
+    P2 --> P3["Idle or oversized<br/>instances keep running"]
+    P3 --> P4["Recurring cloud<br/>overspend"]
+```
+
+## Motivation
+
+This project applies Operations Research and Managerial Accounting ideas
+(cost-center management and operational-expenditure control) to cloud
+infrastructure, a discipline known as **FinOps**. Right-sizing is a
+decision-under-uncertainty problem: act too late and money is wasted, act too
+aggressively and a production system breaks. The goal is to show how
+forecasting, an LLM agent and hard safety rules can work together so that
+cost decisions are fast, explainable and bounded by policy.
+
+## Target Users
+
+- **Platform/DevOps/SRE teams** who own a cloud budget and want automated,
+policy-bound right-sizing recommendations.
+- **FinOps/engineering leadership** who need auditable, explainable cost
+optimization decisions rather than an opaque "auto-scaler."
