@@ -117,3 +117,131 @@ optimization decisions rather than an opaque "auto-scaler."
 | **Safe execution** | `dry_run` semantics end-to-end: every action can be previewed before execution. |
 | **Evaluation** | An evaluation harness that scores agent decisions against a golden, hand-labeled dataset and reports accuracy. |
 | **Dashboard** | A Streamlit dashboard for fleet overview, forecasts, and triggering agent runs. |
+
+
+## Architecture
+
+<!--
+IMAGE PLACEHOLDER 2 (architecture illustration)
+Save your image as: docs/images/architecture.png  (suggested size: 1400x800)
+Then delete this comment block and uncomment the line below:
+
+<p align="center"><img src="docs/images/architecture.png" alt="System architecture illustration" width="90%"></p>
+-->
+
+```mermaid
+flowchart LR
+    subgraph DL["Data Layer"]
+        B["Synthetic Billing/Usage Generator"] --> DB[("SQLite/Postgres")]
+    end
+
+    subgraph IL["Intelligence Layer"]
+        DB --> F["Holt-Winters Forecasting Service"]
+        F --> A["LangGraph ReAct Agent / Rule-Based Fallback"]
+        DB --> A
+    end
+
+    subgraph AL["Action Layer"]
+        A -->|"propose_resize / propose_shutdown tools"| G["Guardrails"]
+        G --> CP["Simulated Cloud Provider"]
+        CP --> DB
+    end
+
+    subgraph IF["Interfaces"]
+        API["FastAPI REST API"] --> A
+        API --> F
+        API --> DB
+        UI["Streamlit Dashboard"] --> API
+    end
+
+    classDef data fill:#e8f1fb,stroke:#3b82c4,color:#0b2a4a;
+    classDef intel fill:#eaf7ee,stroke:#2e9e5b,color:#0d3a1f;
+    classDef action fill:#fdf0e3,stroke:#d9822b,color:#4a2a05;
+    classDef iface fill:#f3eafb,stroke:#8a4fc4,color:#2e0f4a;
+    class B,DB data;
+    class F,A intel;
+    class G,CP action;
+    class API,UI iface;
+```
+
+### System Workflow
+
+1. Usage telemetry (hourly CPU/memory/network) accumulates per instance.
+2. On an optimize request, the forecasting service fits a seasonal
+Holt-Winters model (or falls back to a moving average) to project CPU
+utilization over the next 7 days.
+3. The agent — LLM ReAct if `LLM_PROVIDER` is configured with a key,
+otherwise the deterministic rule-based engine — evaluates trailing +
+forecasted CPU against policy thresholds and the instance's
+`criticality` tag.
+4. The agent calls a tool to propose (or, if `dry_run=False`, execute) a
+`resize` or `shutdown`. Tools enforce guardrails independently of the
+agent's reasoning (e.g. production instances can never be shut down).
+5. Every decision is persisted as an `AgentAction` row with its numeric
+reasoning and estimated monthly savings, giving a full audit trail.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User / Dashboard
+    participant API as FastAPI
+    participant AG as Agent (LLM or rule-based)
+    participant FC as Forecasting Service
+    participant TL as Tools + Guardrails
+    participant CP as Simulated Cloud Provider
+    participant DB as Database
+
+    U->>API: POST /api/v1/agent/optimize
+    API->>AG: run_agent_optimization(instance_id, dry_run)
+    AG->>DB: read usage summary
+    AG->>FC: forecast next 7 days of CPU
+    FC-->>AG: forecast average + backtest MAE
+    AG->>TL: propose_resize / propose_shutdown
+    TL->>TL: enforce guardrails
+    alt dry_run = false and guardrails pass
+        TL->>CP: execute resize / shutdown
+    end
+    TL->>DB: persist AgentAction (reasoning + savings)
+    API-->>U: actions + total estimated monthly savings
+```
+
+### Data Model
+
+```mermaid
+erDiagram
+    CLOUD_INSTANCE ||--o{ USAGE_METRIC : "has hourly"
+    CLOUD_INSTANCE ||--o{ AGENT_ACTION : "receives"
+
+    CLOUD_INSTANCE {
+        int id PK
+        string instance_id UK
+        string name
+        string instance_type
+        string region
+        string provider
+        enum status
+        json tags
+    }
+    USAGE_METRIC {
+        int id PK
+        int instance_id FK
+        datetime timestamp
+        float cpu_utilization_pct
+        float memory_utilization_pct
+        float network_in_mb
+        float network_out_mb
+    }
+    AGENT_ACTION {
+        int id PK
+        int instance_id FK
+        enum action_type
+        string previous_instance_type
+        string new_instance_type
+        text reasoning
+        float forecasted_avg_cpu
+        float estimated_monthly_savings
+        bool dry_run
+        enum status
+        string agent_source
+    }
+```
