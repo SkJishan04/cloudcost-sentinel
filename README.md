@@ -245,3 +245,68 @@ erDiagram
         string agent_source
     }
 ```
+
+
+## AI/ML/GenAI Methodology
+
+- **Forecasting**: Holt-Winters exponential smoothing with additive trend and
+24-hour seasonality (`statsmodels`), chosen over Prophet to avoid a heavy
+native build toolchain for hourly, short-horizon operational forecasting.
+Backtested with a held-out 24-hour window and reported as MAE.
+- **Agent orchestration**: `langgraph.prebuilt.create_react_agent` gives the
+LLM a fixed toolset (`list_all_instances`, `get_instance_usage_summary`,
+`get_forecast`, `propose_resize`, `propose_shutdown`) and a system prompt
+encoding the FinOps policy; the LLM must call the data tools before
+proposing an action rather than inferring numbers.
+- **Hallucination mitigation**: the LLM never has authority to fabricate
+utilization numbers — all figures come from tool calls against the real
+(simulated) database — and destructive actions are re-validated by
+guardrails in the tool layer, not trusted from the LLM's text output.
+- **Reliability**: LLM tool invocations are wrapped in retry-with-backoff
+(`tenacity`); on repeated failure, the run transparently falls back to the
+rule-based policy engine so the API never hard-fails.
+- **Evaluation**: `evaluation/evaluate_agent.py` runs the active agent against
+a golden dataset of 8 labeled scenarios spanning all four policy branches
+(production/non-production × idle/steady) and reports accuracy plus a
+per-case breakdown, written to `evaluation/report.json`.
+
+### Decision Policy
+
+Both the LLM agent and the rule-based engine implement the same policy. An
+instance is **underutilized** when both its trailing average CPU and its
+forecasted average CPU are below `UNDERUTILIZED_CPU_THRESHOLD`.
+
+```mermaid
+flowchart TD
+    S(["Evaluate instance"]) --> D1{"Forecast CPU above 80%<br/>of capacity?"}
+    D1 -->|Yes| R1["RESIZE up to next larger tier"]
+    D1 -->|No| D2{"Underutilized?<br/>avg CPU and forecast CPU<br/>below threshold"}
+    D2 -->|No| N["NO_ACTION"]
+    D2 -->|Yes| D3{"Criticality tag"}
+    D3 -->|production| R2["RESIZE down to next smaller tier"]
+    D3 -->|non-production| X["SHUTDOWN"]
+
+    classDef ok fill:#eaf7ee,stroke:#2e9e5b,color:#0d3a1f;
+    classDef warn fill:#fdf0e3,stroke:#d9822b,color:#4a2a05;
+    classDef neutral fill:#eef0f3,stroke:#6b7280,color:#1f2937;
+    class R1,R2 ok;
+    class X warn;
+    class N neutral;
+```
+
+> **Guardrail:** a `shutdown` proposed for a production-tagged instance is
+> rejected at the tool layer and logged as `REJECTED`, regardless of what the
+> LLM decided. Production instances can only ever be resized.
+
+### Graceful Degradation
+
+```mermaid
+flowchart LR
+    R(["Optimize request"]) --> Q{"LLM provider and<br/>API key configured?"}
+    Q -->|No| RB["Rule-based policy engine"]
+    Q -->|Yes| L["LangGraph ReAct agent<br/>with retry and backoff"]
+    L -->|success| OUT(["Actions returned"])
+    L -->|repeated failure| RB
+    RB --> OUT
+```
+
