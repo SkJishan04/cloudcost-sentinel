@@ -104,3 +104,16 @@ cost decisions are fast, explainable and bounded by policy.
 policy-bound right-sizing recommendations.
 - **FinOps/engineering leadership** who need auditable, explainable cost
 optimization decisions rather than an opaque "auto-scaler."
+
+## Key Features
+
+| Area | What it does |
+|---|---|
+| **Usage telemetry** | Synthetic but realistic hourly usage telemetry generation (idle, business-hours, steady-high and spiky profiles) standing in for a CloudWatch-style billing/metrics feed. |
+| **Forecasting** | Holt-Winters seasonal time-series forecasting of CPU utilization, with automatic fallback to a moving-average model when history is too short, and self-reported backtest MAE. |
+| **LLM agent** | A **LangGraph ReAct tool-calling agent** that reasons over usage summaries and forecasts, then calls `propose_resize` / `propose_shutdown` tools against a simulated cloud control plane. |
+| **Rule-based engine** | A **deterministic rule-based policy engine** implementing the exact same FinOps policy — used automatically when no LLM API key is configured, and used as the ground-truth baseline in the evaluation harness. |
+| **Guardrails** | **Guardrails enforced at the tool layer** (not just the prompt): production-tagged instances can never be shut down, regardless of what the LLM decides. |
+| **Safe execution** | `dry_run` semantics end-to-end: every action can be previewed before execution. |
+| **Evaluation** | An evaluation harness that scores agent decisions against a golden, hand-labeled dataset and reports accuracy. |
+| **Dashboard** | A Streamlit dashboard for fleet overview, forecasts, and triggering agent runs. |
