@@ -513,3 +513,60 @@ pie showData title Demo fleet monthly cost (USD, approx.)
 > measured savings on a real cloud account. Exact values can vary slightly
 > between runs because usage history is generated relative to the current time.
 
+## Testing
+
+```bash
+pytest -v --cov=app
+```
+
+Covers: cost calculator math, forecasting (including the insufficient-data
+edge case), rule-based policy correctness for all four production/criticality
+branches, the production-shutdown guardrail at the tool layer, and FastAPI
+integration tests (404 handling, instance CRUD, agent endpoint).
+
+| Test module | Focus |
+|---|---|
+| `test_cost_calculator.py` | Pricing catalog, tier navigation, savings arithmetic, unknown instance types |
+| `test_forecasting_service.py` | Forecast shape and bounds, seasonal model selection, insufficient-data error |
+| `test_agent_tools.py` | Resize vs. shutdown policy, `dry_run` safety, production shutdown guardrail |
+| `test_api_instances.py` | Health check, instance CRUD, 404 handling, cost endpoint, agent endpoint |
+
+Tests run against an isolated in-memory SQLite database, so they never touch
+your local `finops.db` and need no API keys.
+
+## Evaluation Methodology
+
+```bash
+python -m evaluation.evaluate_agent
+```
+
+Runs the active policy engine against an 8-case golden dataset covering
+production/non-production instances under idle, steady-high and
+business-hours usage profiles, and reports accuracy plus per-case predicted
+vs. expected actions to `evaluation/report.json`.
+
+```mermaid
+flowchart LR
+    G["Golden dataset<br/>8 labeled scenarios"] --> S["Seed isolated<br/>in-memory database"]
+    S --> R["Run active agent<br/>LLM or rule-based"]
+    R --> C["Compare predicted action<br/>with expected action"]
+    C --> M["Accuracy and<br/>per-case breakdown"]
+    M --> J[("evaluation/report.json")]
+```
+
+| Case | Criticality | Usage profile | Expected action |
+|---|---|---|---|
+| `eval-prod-idle-01` | production | idle | resize |
+| `eval-prod-idle-02` | production | idle | resize |
+| `eval-nonprod-idle-01` | non-production | idle | shutdown |
+| `eval-nonprod-idle-02` | non-production | idle | shutdown |
+| `eval-prod-steady-01` | production | steady_high | no_action |
+| `eval-nonprod-steady-01` | non-production | steady_high | no_action |
+| `eval-prod-business-01` | production | business_hours | no_action |
+| `eval-nonprod-business-01` | non-production | business_hours | no_action |
+
+> With `LLM_PROVIDER=none` this harness measures how faithfully the
+> deterministic engine implements the labeled policy. With an LLM configured,
+> the same dataset measures how closely the ReAct agent matches that policy,
+> which makes it a useful regression check when changing prompts or models.
+
