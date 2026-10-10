@@ -413,3 +413,103 @@ streamlit run frontend/dashboard.py
 On first start the database is created and a demo fleet of 6 instances with 14
 days of synthetic hourly usage is seeded automatically (`AUTO_SEED=true`).
 
+## Usage Examples
+
+### API Usage
+
+```bash
+curl http://localhost:8000/api/v1/instances
+curl http://localhost:8000/api/v1/usage/i-prod-api-01/summary
+curl http://localhost:8000/api/v1/forecast/i-prod-api-01
+curl -X POST http://localhost:8000/api/v1/agent/optimize \
+  -H "Content-Type: application/json" \
+  -d '{"instance_id": "i-staging-web-01", "dry_run": true}'
+```
+
+Omit `instance_id` to evaluate the entire fleet. Set `"dry_run": false` to
+actually execute the proposed action against the simulated cloud provider.
+
+**Example response** for the optimize call above:
+
+```json
+{
+  "agent_source": "rule_based",
+  "evaluated_instances": 1,
+  "actions": [
+    {
+      "instance_id": "i-staging-web-01",
+      "action_type": "shutdown",
+      "previous_instance_type": "t3.xlarge",
+      "new_instance_type": null,
+      "reasoning": "Underutilized non-production instance; recommending shutdown. avg_cpu=4.87%, forecast_avg_cpu=4.92%, threshold=15.0%, criticality=non-production",
+      "forecasted_avg_cpu": 4.92,
+      "estimated_monthly_savings": 121.47,
+      "dry_run": true,
+      "status": "proposed",
+      "agent_source": "rule_based"
+    }
+  ],
+  "total_estimated_monthly_savings": 121.47
+}
+```
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/health` | GET | Service status and whether an LLM is enabled |
+| `/api/v1/instances` | GET, POST | List or register instances |
+| `/api/v1/instances/{instance_id}` | GET | Instance details |
+| `/api/v1/instances/{instance_id}/cost` | GET | Hourly and monthly cost |
+| `/api/v1/usage/{instance_id}` | GET | Raw usage metrics |
+| `/api/v1/usage/{instance_id}/summary` | GET | Avg/max/min CPU and memory |
+| `/api/v1/forecast/{instance_id}` | GET | CPU forecast with backtest MAE |
+| `/api/v1/agent/optimize` | POST | Run the optimization agent |
+
+### Dashboard Walkthrough
+
+<!--
+IMAGE PLACEHOLDER 3 (dashboard screenshot or demo illustration)
+Save your image as: docs/images/dashboard-preview.png  (suggested size: 1400x800)
+Then delete this comment block and uncomment the line below:
+
+<p align="center"><img src="docs/images/dashboard-preview.png" alt="Streamlit dashboard preview" width="90%"></p>
+-->
+
+1. **Fleet Overview:** a table of all instances with type, status and criticality.
+2. **Inspect an Instance:** pick an instance to see its usage summary and 7-day CPU forecast chart.
+3. **Run the Optimization Agent:** keep **Dry run** on, choose *This instance only* or *Entire fleet*, then click **Run Agent**.
+4. **Review the results table:** each row shows the proposed action, reasoning and estimated monthly savings.
+5. *(Optional)* Turn **Dry run** off and run again to execute actions; the affected instances then show as `stopped` or resized in the Fleet Overview.
+
+## Results
+
+Typical output of a fleet-wide dry run on the seeded demo fleet
+(synthetic data, so figures are illustrative):
+
+| Instance | Type | Criticality | Avg CPU | Forecast CPU | Action | Est. monthly savings |
+|---|---|---|---|---|---|---|
+| `i-prod-api-01` | m5.2xlarge | production | 22.98% | 20.36% | no_action | $0.00 |
+| `i-prod-db-01` | m5.4xlarge | production | 58.99% | 58.57% | no_action | $0.00 |
+| `i-staging-web-01` | t3.xlarge | non-production | 4.87% | 4.92% | **shutdown** | $121.47 |
+| `i-dev-batch-01` | t3.large | non-production | 4.96% | 4.63% | **shutdown** | $60.74 |
+| `i-prod-worker-01` | t3.medium | production | 32.24% | 31.76% | no_action | $0.00 |
+| `i-qa-loadtest-01` | m5.xlarge | non-production | 4.98% | 5.14% | **shutdown** | $140.16 |
+| **Total** | | | | | | **$322.37** |
+
+```mermaid
+pie showData title Demo fleet monthly cost (USD, approx.)
+    "Savings identified" : 322.37
+    "Remaining spend" : 871.33
+```
+
+| Metric | Value |
+|---|---|
+| Fleet monthly cost before optimization | about $1,193.70 |
+| Estimated monthly savings identified | $322.37 (about **27%**) |
+| Golden-dataset accuracy | 100% (8/8 cases) |
+| Automated tests | 21 passing |
+
+> These numbers come from a simulated fleet with synthetic usage data and an
+> illustrative pricing catalog. They demonstrate how the system behaves, not
+> measured savings on a real cloud account. Exact values can vary slightly
+> between runs because usage history is generated relative to the current time.
+
