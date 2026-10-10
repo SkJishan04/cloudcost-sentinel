@@ -570,3 +570,53 @@ flowchart LR
 > the same dataset measures how closely the ReAct agent matches that policy,
 > which makes it a useful regression check when changing prompts or models.
 
+## Limitations
+
+- Billing/usage data is synthetically generated, not pulled from a real
+cloud billing API (AWS Cost Explorer, Azure Cost Management) — the
+`CloudProviderClient` interface is designed so a real integration is a
+drop-in implementation.
+- The instance pricing catalog is illustrative, not live pricing.
+- Forecasting uses classical statistical methods (Holt-Winters); it does not
+currently include a deep learning (LSTM) forecaster, though the service
+boundary is designed to accept one.
+- The default evaluation and test runs use the deterministic rule-based engine;
+LLM-agent runs require an API key and are non-deterministic by nature.
+- The golden dataset is small (8 scenarios) and designed to verify policy
+conformance, not to claim generalization to real production fleets.
+
+## Future Improvements
+
+- Real cloud provider integration (boto3/Azure SDK) behind the existing
+`CloudProviderClient` interface.
+- Multi-step LangGraph workflow with an explicit human-approval node before
+executing non-dry-run destructive actions.
+- Experiment tracking (e.g. MLflow) for forecasting model comparisons across
+instance profiles.
+- Cost/latency/token tracking for LLM agent runs as a first-class metric.
+
+### Roadmap
+
+```mermaid
+flowchart LR
+    N["Near term<br/>Docker and docker-compose<br/>CI/CD with automated tests"] --> M["Mid term<br/>Real cloud provider integration<br/>Human-approval workflow node<br/>Alembic migrations on Postgres"]
+    M --> L["Longer term<br/>LSTM forecaster comparison<br/>MLflow experiment tracking<br/>LLM cost and latency metrics"]
+```
+
+| Horizon | Item |
+|---|---|
+| Near term | Containerization with Docker and docker-compose (backend and optional Postgres) |
+| Near term | CI/CD pipeline running the test suite and evaluation on every push |
+| Mid term | Real cloud provider integration, human-approval node, Alembic migrations |
+| Longer term | LSTM forecaster comparison, MLflow experiment tracking, LLM cost/latency metrics |
+
+## License
+
+See the [LICENSE](LICENSE) file for details.
+
+## Author
+
+Built by [SkJishan04](https://github.com/SkJishan04) as an AI/ML/GenAI
+engineering portfolio project exploring FinOps, time-series forecasting and
+tool-calling agents.
+
