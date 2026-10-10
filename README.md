@@ -310,3 +310,50 @@ flowchart LR
     RB --> OUT
 ```
 
+## Technology Stack
+
+| Layer               | Technology                                         | Why                                                                 |
+| ------------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
+| API                 | FastAPI + Pydantic v2                              | Async-ready, typed request/response validation, auto OpenAPI docs   |
+| ORM/DB              | SQLAlchemy 2.0 (SQLite default, Postgres-ready)    | Zero-config local dev; swap `DATABASE_URL` for production           |
+| Forecasting         | statsmodels (Holt-Winters)                         | Lightweight, pure-Python seasonal forecasting suited to hourly data |
+| Agent orchestration | LangGraph (`create_react_agent`) + LangChain tools | Standard tool-calling ReAct pattern, model-agnostic                 |
+| LLM providers       | Anthropic / OpenAI (optional)                      | Pluggable via `LLM_PROVIDER`; app runs fully without either         |
+| Retry/reliability   | `tenacity`                                         | Exponential backoff around LLM tool invocations                     |
+| Frontend            | Streamlit                                          | Fast, professional dashboard without a separate JS build            |
+| Testing             | pytest                                             | Unit, integration and guardrail tests                               |
+
+## Project Structure
+
+```text
+cloudcost-sentinel/
+├── app/
+│   ├── main.py                # FastAPI app, lifespan seeding, routers
+│   ├── config.py              # Environment-driven settings
+│   ├── db/                    # Engine, session, ORM models, init
+│   ├── schemas/               # Pydantic request/response models
+│   ├── services/              # Billing sim, forecasting, cost math, cloud provider
+│   ├── agent/                 # Prompts, tools, rule-based engine, LangGraph orchestration
+│   └── api/routes/            # instances, usage, forecast, agent endpoints
+├── scripts/seed_data.py       # Demo fleet seeding
+├── evaluation/                # Golden dataset + evaluation harness
+├── frontend/dashboard.py      # Streamlit UI
+└── tests/                     # Unit + integration tests
+```
+
+```mermaid
+flowchart TD
+    API["api/routes<br/>HTTP layer"] --> SVC["services<br/>billing, forecasting, cost, cloud provider"]
+    API --> AGT["agent<br/>prompts, tools, rule-based, LangGraph"]
+    AGT --> SVC
+    SVC --> DBL["db<br/>engine, session, ORM models"]
+    API --> SCH["schemas<br/>Pydantic models"]
+    CFG["config.py<br/>environment settings"] -.-> API
+    CFG -.-> SVC
+    CFG -.-> AGT
+```
+
+Routes stay thin, business logic lives in `services/`, and the agent's tools are
+thin wrappers around the same services, so the LLM agent and the rule-based
+engine share one implementation of the underlying cost and forecasting logic.
+
