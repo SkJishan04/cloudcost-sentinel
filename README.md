@@ -357,3 +357,59 @@ Routes stay thin, business logic lives in `services/`, and the agent's tools are
 thin wrappers around the same services, so the LLM agent and the rule-based
 engine share one implementation of the underlying cost and forecasting logic.
 
+## Setup Instructions
+
+**Prerequisites:** Python 3.10 or newer.
+
+```bash
+git clone https://github.com/SkJishan04/cloudcost-sentinel.git
+cd cloudcost-sentinel
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+> **Windows:** activate the virtual environment with `.venv\Scripts\activate`
+> and copy the env file with `copy .env.example .env`.
+
+By default `LLM_PROVIDER=none`, so the app runs immediately on the
+deterministic rule-based policy with no API key required. To use a real LLM
+agent, set `LLM_PROVIDER=anthropic` (or `openai`) and the matching API key in `.env`.
+
+## Environment Variables
+
+| Variable                               | Description                             | Default                      |
+| -------------------------------------- | --------------------------------------- | ---------------------------- |
+| `DATABASE_URL`                         | SQLAlchemy connection string            | `sqlite:///./finops.db`      |
+| `LLM_PROVIDER`                         | `anthropic` \| `openai` \| `none`       | `none`                       |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Provider API key                        | unset                        |
+| `LLM_MODEL`                            | Model name for the selected provider    | `claude-3-5-sonnet-20241022` |
+| `UNDERUTILIZED_CPU_THRESHOLD`          | % below which CPU is "underutilized"    | `15.0`                       |
+| `FORECAST_HORIZON_HOURS`               | Forecast horizon                        | `168` (7 days)               |
+| `HISTORY_LOOKBACK_DAYS`                | Usage history window                    | `14`                         |
+| `DRY_RUN_DEFAULT`                      | Default `dry_run` for `/agent/optimize` | `true`                       |
+| `AUTO_SEED`                            | Seed demo fleet on empty DB at startup  | `true`                       |
+| `APP_NAME`                             | Application display name                | `FinOps Optimization Agent`  |
+| `ENV`                                  | `development` \| `test` \| `production` | `development`                |
+| `LOG_LEVEL`                            | Logging verbosity                       | `INFO`                       |
+| `CORS_ORIGINS`                         | Comma-separated allowed origins         | `*`                          |
+
+Secrets such as API keys are read only from environment variables and are never
+stored in source code. `.env` is git-ignored.
+
+## Running Locally
+
+```bash
+uvicorn app.main:app --reload
+# API docs: http://localhost:8000/docs
+```
+
+In a second terminal (with the virtual environment activated):
+
+```bash
+streamlit run frontend/dashboard.py
+```
+
+On first start the database is created and a demo fleet of 6 instances with 14
+days of synthetic hourly usage is seeded automatically (`AUTO_SEED=true`).
+
