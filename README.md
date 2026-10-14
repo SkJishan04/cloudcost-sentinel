@@ -389,7 +389,7 @@ agent, set `LLM_PROVIDER=anthropic` (or `openai`) and the matching API key in `.
 | `DATABASE_URL`                         | SQLAlchemy connection string            | `sqlite:///./finops.db`      |
 | `LLM_PROVIDER`                         | `anthropic` \| `openai` \| `none`       | `none`                       |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Provider API key                        | unset                        |
-| `LLM_MODEL`                            | Model name for the selected provider    | `claude-3-5-sonnet-20241022` |
+| `LLM_MODEL`                            | Model name for the selected provider    | `claude-sonnet-5-5` |
 | `UNDERUTILIZED_CPU_THRESHOLD`          | % below which CPU is "underutilized"    | `15.0`                       |
 | `FORECAST_HORIZON_HOURS`               | Forecast horizon                        | `168` (7 days)               |
 | `HISTORY_LOOKBACK_DAYS`                | Usage history window                    | `14`                         |
@@ -544,7 +544,7 @@ pie showData title Demo fleet monthly cost (USD, approx.)
 | Fleet monthly cost before optimization | about $1,193.70 |
 | Estimated monthly savings identified | $322.37 (about **27%**) |
 | Golden-dataset accuracy | 100% (8/8 cases) |
-| Automated tests | 21 passing |
+| Automated tests | 25 passing |
 
 > These numbers come from a simulated fleet with synthetic usage data and an
 > illustrative pricing catalog. They demonstrate how the system behaves, not
@@ -568,6 +568,7 @@ integration tests (404 handling, instance CRUD, agent endpoint).
 | `test_forecasting_service.py` | Forecast shape and bounds, seasonal model selection, insufficient-data error |
 | `test_agent_tools.py` | Resize vs. shutdown policy, `dry_run` safety, production shutdown guardrail |
 | `test_api_instances.py` | Health check, instance CRUD, 404 handling, cost endpoint, agent endpoint |
+| `test_llm_agent.py` | LangGraph ReAct loop with a scripted fake model: tool calls, guardrail rejection, no-action records, rule-based fallback |
 
 Tests run against an isolated in-memory SQLite database, so they never touch
 your local `finops.db` and need no API keys.
@@ -618,8 +619,10 @@ drop-in implementation.
 - Forecasting uses classical statistical methods (Holt-Winters); it does not
 currently include a deep learning (LSTM) forecaster, though the service
 boundary is designed to accept one.
-- The default evaluation and test runs use the deterministic rule-based engine;
-LLM-agent runs require an API key and are non-deterministic by nature.
+- The default evaluation and test runs use the deterministic rule-based engine.
+The LangGraph ReAct loop is covered by offline tests with a scripted fake model,
+but it has not yet been benchmarked against a live LLM provider, and live runs
+require an API key and are non-deterministic by nature.
 - The golden dataset is small (8 scenarios) and designed to verify policy
 conformance, not to claim generalization to real production fleets.
 
