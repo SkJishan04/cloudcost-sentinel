@@ -40,10 +40,12 @@ production-shaped prototype of a corporate FinOps automation system.
 - [Setup Instructions](#setup-instructions)
 - [Environment Variables](#environment-variables)
 - [Running Locally](#running-locally)
+- [Run in Google Colab](#run-in-google-colab)
 - [Usage Examples](#usage-examples)
   - [API Usage](#api-usage)
   - [Dashboard Walkthrough](#dashboard-walkthrough)
 - [Results](#results)
+
 - [Testing](#testing)
 - [Evaluation Methodology](#evaluation-methodology)
 - [Limitations](#limitations)
