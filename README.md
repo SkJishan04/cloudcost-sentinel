@@ -419,6 +419,38 @@ streamlit run frontend/dashboard.py
 On first start the database is created and a demo fleet of 6 instances with 14
 days of synthetic hourly usage is seeded automatically (`AUTO_SEED=true`).
 
+## Run in Google Colab
+
+No local setup needed. Open the notebook and run it in your browser:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/SkJishan04/cloudcost-sentinel/blob/main/notebooks/finops_agent_colab.ipynb)
+
+The notebook (`notebooks/finops_agent_colab.ipynb`) clones this repository, installs the
+pinned dependencies and walks through the whole project. No API key is required.
+
+```mermaid
+flowchart LR
+    A["Clone repo<br/>and install"] --> B["Run pytest<br/>and evaluation"]
+    B --> C["Start FastAPI<br/>backend"]
+    C --> D["Explore fleet<br/>and forecasts"]
+    D --> E["Run agent<br/>dry run, then execute"]
+    E --> F["Guardrail demo"]
+```
+
+| Step | What you can do |
+|---|---|
+| Tests | Run the full pytest suite (21 tests) and see the results |
+| Evaluation | Score the agent against the 8-case golden dataset |
+| Backend | Start the FastAPI service inside the Colab VM |
+| Forecasting | Plot a 7-day Holt-Winters CPU forecast for any instance |
+| Agent | Run a dry run, then real execution, and review the audit trail |
+| Guardrail | Try to shut down a production instance and watch it get blocked |
+| Optional | Switch on a real LLM agent, or open the Streamlit dashboard via ngrok |
+
+> Colab sessions are temporary: the database and any changes are reset when the
+> session ends. If the install cell reports a dependency conflict, use
+> **Runtime > Restart session** and run the notebook again from the top.
+
 ## Usage Examples
 
 ### API Usage
