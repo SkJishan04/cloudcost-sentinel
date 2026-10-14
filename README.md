@@ -9,6 +9,10 @@ Then delete this comment block and uncomment the line below:
 -->
 
 <p align="center">
+<a href="https://colab.research.google.com/github/SkJishan04/cloudcost-sentinel/blob/main/notebooks/finops_agent_colab.ipynb">
+    <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab">
+  </a>
+
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/LangGraph-ReAct%20Agent-1C3C3C" alt="LangGraph">
