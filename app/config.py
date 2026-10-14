@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Literal["anthropic", "openai", "none"] = "none"
     ANTHROPIC_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
-    LLM_MODEL: str = "claude-3-5-sonnet-20241022"
+    LLM_MODEL: str = "claude-sonnet-5-5"
 
     # FinOps policy thresholds
     UNDERUTILIZED_CPU_THRESHOLD: float = 15.0
